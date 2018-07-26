@@ -1,0 +1,66 @@
+#!/bin/bash
+
+host_connect_check () {
+>hosts_notconnecting
+>hosts_connecting
+printf "Please provide the port inventory filename to proceed [prod_port.in or nonprod_port.inv]: "
+read port_validation
+printf "Enter to proceed..."
+read
+
+for i in `cat "$port_validation"`
+do
+host="`echo $i|cut -d, -f1`"
+port="`echo $i|cut -d, -f2`"
+printf "Checking connectivity for Host $host..."
+ping -c 3 $host 2>/dev/null 1>&2
+result="`echo $?`"
+if [ $result -ne 0 ]
+then
+echo $i >> hosts_notconnecting
+printf "##Not Connecting##\n"
+else
+echo $i >> hosts_connecting
+printf "Connecting\n"
+fi
+done
+}
+
+host_telnet_check () {
+
+>port_notconnecting
+>port_connecting
+
+
+for i in `cat hosts_connecting`
+do
+host="`echo $i|cut -d, -f1`"
+port="`echo $i|cut -d, -f2`"
+printf "Checking Port connectivity for  $host:$port..."
+
+nc -z $host $port  2>/dev/null 1>&2
+
+result="`echo $?`"
+if [ $result -ne 0 ]
+then
+echo $i >> port_notconnecting
+printf "## Port Not Connecting##\n"
+else
+echo $i >> port_connecting
+printf "Connecting\n"
+fi
+done
+}
+
+result_publish () {
+>Results
+echo " HOST Not Connecting " >> Results
+cat hosts_notconnecting >> Results
+echo "Connected Host with no port Connectivity" >> Results
+cat port_notconnecting >> Results
+cat Results |mail -s "`hostname` Firewall Port Validations: Automation Testing" openshift_support@keybank.com
+}
+
+host_connect_check
+host_telnet_check
+result_publish
